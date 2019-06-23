@@ -1,6 +1,9 @@
-#pragma once
+/*
+ * PriorityBoosterCommon.h
+ * Common definitions utilized by both the kernel driver and client program. 
+ */
 
-#include <ntddk.h>
+#pragma once
 
 // identifies the type of device
 // (not so relevant for software drivers, like this one)
@@ -17,7 +20,7 @@
 #define IOCTL_PRIORITY_BOOSTER_SET_PRIORITY CTL_CODE(PRIORITY_BOOSTER_DEVICE, 0x800, METHOD_NEITHER, FILE_ANY_ACCESS)
 
 // struct defines the format of the data the driver expects from clients
-struct ThreadData {
+typedef struct ThreadData {
 	ULONG ThreadId;
 	int Priority;
-};
+} ThreadData_t;
