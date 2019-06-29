@@ -1,5 +1,6 @@
 /*
  * SysMon.h
+ * Kernel driver that supports monitoring of system events via user-mode client.
  */
 
 #pragma once

@@ -1,5 +1,6 @@
 /*
  * SyncHelpers.cpp
+ * Synchronization helpers.
  */
 
 #include "pch.h"

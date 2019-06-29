@@ -1,5 +1,6 @@
 /*
  * SyncHelpers.h
+ * Synchronization helpers.
  */
 
 #pragma once

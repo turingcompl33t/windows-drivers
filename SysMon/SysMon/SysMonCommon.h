@@ -1,5 +1,6 @@
 /*
  * SysMonCommon.cpp
+ * Common structures shared between driver and client code. 
  */
 
 #pragma once

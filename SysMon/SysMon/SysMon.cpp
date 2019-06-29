@@ -1,5 +1,6 @@
 /*
  * SysMon.cpp
+ * Kernel driver that supports monitoring of system events via user-mode client. 
  */
 
 #include "pch.h"
