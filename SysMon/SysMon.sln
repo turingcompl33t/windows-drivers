@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.29020.237
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SysMon", "SysMon\SysMon.vcxproj", "{BCA785ED-61CD-4010-BA1A-F59E6664044E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SysMonClient", "SysMonClient\SysMonClient.vcxproj", "{B772D03A-42AA-455D-A95E-02CA0354A03B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -17,6 +19,10 @@ Global
 		{BCA785ED-61CD-4010-BA1A-F59E6664044E}.Release|x64.ActiveCfg = Debug|x64
 		{BCA785ED-61CD-4010-BA1A-F59E6664044E}.Release|x64.Build.0 = Debug|x64
 		{BCA785ED-61CD-4010-BA1A-F59E6664044E}.Release|x64.Deploy.0 = Debug|x64
+		{B772D03A-42AA-455D-A95E-02CA0354A03B}.Debug|x64.ActiveCfg = Debug|x64
+		{B772D03A-42AA-455D-A95E-02CA0354A03B}.Debug|x64.Build.0 = Debug|x64
+		{B772D03A-42AA-455D-A95E-02CA0354A03B}.Release|x64.ActiveCfg = Release|x64
+		{B772D03A-42AA-455D-A95E-02CA0354A03B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -2,15 +2,33 @@
  * SysMon.cpp
  */
 
+#include "pch.h"
 #include "SysMon.h"
 #include "SysMonCommon.h"
-
 #include "SyncHelpers.h"
 
-void PushItem(LIST_ENTRY* entry);
+ /* ----------------------------------------------------------------------------
+	 Function Prototypes 
+ */
+
+void SysMonUnload(PDRIVER_OBJECT DriverObject);
+
+NTSTATUS SysMonCreateClose(PDEVICE_OBJECT, PIRP Irp);
+NTSTATUS SysMonRead(PDEVICE_OBJECT, PIRP Irp);
+
 void OnProcessNotify(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo);
 
+void PushItem(LIST_ENTRY* entry);
+
+/* ----------------------------------------------------------------------------
+	Global Variables
+*/
+
 Globals g_Globals;
+
+/* ----------------------------------------------------------------------------
+	Core Driver Functions
+*/
 
 extern "C" NTSTATUS
 DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING)
@@ -73,11 +91,126 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING)
 	return status;
 }
 
+void SysMonUnload(PDRIVER_OBJECT DriverObject)
+{
+	// unregister process notifications
+	PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, TRUE);
+
+	UNICODE_STRING symLink = RTL_CONSTANT_STRING(L"\\??\\sysmon");
+	IoDeleteSymbolicLink(&symLink);
+	IoDeleteDevice(DriverObject->DeviceObject);
+
+	// free remaining items in our list, lest we leak memory
+	while (!IsListEmpty(&g_Globals.ItemsHead))
+	{
+		auto entry = RemoveHeadList(&g_Globals.ItemsHead);
+		ExFreePool(CONTAINING_RECORD(entry, FullItem<ItemHeader>, Entry));
+	}
+}
+
+/* ----------------------------------------------------------------------------
+	Major Function Routines
+*/
+
+NTSTATUS SysMonCreateClose(PDEVICE_OBJECT, PIRP Irp)
+{
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	Irp->IoStatus.Information = 0; 
+	IoCompleteRequest(Irp, 0);
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS SysMonRead(PDEVICE_OBJECT, PIRP Irp)
+{
+	auto stack = IoGetCurrentIrpStackLocation(Irp);
+	auto len = stack->Parameters.Read.Length;
+	auto status = STATUS_SUCCESS;
+	auto count = 0;
+	NT_ASSERT(Irp->MdlAddress);
+
+	auto buffer = (UCHAR*)MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
+	if (!buffer)
+	{
+		status = STATUS_INSUFFICIENT_RESOURCES;
+	}
+	else
+	{
+		AutoLock<FastMutex> lock(g_Globals.Mutex);
+		while (true)
+		{
+			if (IsListEmpty(&g_Globals.ItemsHead))
+				break;
+
+			auto entry = RemoveHeadList(&g_Globals.ItemsHead);
+			auto info = CONTAINING_RECORD(entry, FullItem<ItemHeader>, Entry);
+			auto size = info->Data.Size;
+			if (len < size)
+			{
+				// user's buffer is full, insert item back into list
+				InsertHeadList(&g_Globals.ItemsHead, entry);
+				break;
+			}
+
+			g_Globals.ItemCount--;
+			::memcpy(buffer, &info->Data, size);
+			len -= size;
+			buffer += size;
+			count  += size;
+		}
+
+	}
+
+	Irp->IoStatus.Status = status;
+	Irp->IoStatus.Information = count;
+	IoCompleteRequest(Irp, 0);
+
+	return status;
+}
+
+/* ----------------------------------------------------------------------------
+	Notification Routines
+*/
+
 void OnProcessNotify(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
+	UNREFERENCED_PARAMETER(Process);
+
 	if (CreateInfo)
 	{
 		// process create
+		USHORT allocSize = sizeof(FullItem<ProcessCreateInfo>);
+		USHORT commandLineSize = 0;
+		if (CreateInfo->CommandLine)
+		{
+			commandLineSize = CreateInfo->CommandLine->Length;
+			allocSize += commandLineSize;
+		}
+		auto info = (FullItem<ProcessCreateInfo>*)ExAllocatePoolWithTag(PagedPool, allocSize, DRIVER_TAG);
+		if (nullptr == info)
+		{
+			KdPrint(("Failed to allocate memory for ProcessCreateInfo\n"));
+			return;
+		}
+
+		auto& item = info->Data;
+		KeQuerySystemTimePrecise(&item.Time);
+		item.Type = ItemType::ProcessCreate;
+		item.ProcessId = HandleToUlong(ProcessId);
+		item.ParentProcessId = HandleToUlong(CreateInfo->ParentProcessId);
+
+		if (commandLineSize > 0)
+		{
+			::memcpy((UCHAR*)& item + sizeof(item), CreateInfo->CommandLine->Buffer, commandLineSize);
+			item.CommandLineLength = commandLineSize / sizeof(WCHAR);
+			item.CommandLineOffset = sizeof(item);
+		}
+		else
+		{
+			item.CommandLineLength = 0;
+		}
+
+		PushItem(&info->Entry);
 	}
 	else
 	{
@@ -98,6 +231,10 @@ void OnProcessNotify(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO
 		PushItem(&info->Entry);
 	}
 }
+
+/* ----------------------------------------------------------------------------
+	Helpers
+*/
 
 void PushItem(LIST_ENTRY* entry)
 {

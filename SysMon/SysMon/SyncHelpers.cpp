@@ -2,26 +2,8 @@
  * SyncHelpers.cpp
  */
 
+#include "pch.h"
 #include "SyncHelpers.h"
-
-/* ----------------------------------------------------------------------------
-	Mutex
-*/
-
-void Mutex::Init()
-{
-	KeInitializeMutex(&_mutex);
-}
-
-void Mutex::Lock()
-{
-	KeWaitForSingleObject(&_mutex, Executive, KernelMode, false, nullptr);
-}
-
-void Mutex::Unlock()
-{
-	KeReleaseMutex(&_mutex, false);
-}
 
 /* ----------------------------------------------------------------------------
 	FastMutex 

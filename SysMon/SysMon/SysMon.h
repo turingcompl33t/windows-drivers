@@ -4,6 +4,11 @@
 
 #pragma once
 
+#include "SyncHelpers.h"
+
+// for pool allocation tags 
+#define DRIVER_TAG 'nmys'
+
 template<typename T>
 struct FullItem {
 	LIST_ENTRY Entry;
