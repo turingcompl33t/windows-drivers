@@ -71,6 +71,22 @@ void DisplayInfo(BYTE* buffer, DWORD size)
 				break;
 			}
 
+			case ItemType::ThreadCreate:
+			{
+				DisplayTime(header->Time);
+				auto info = (ThreadCreateExitInfo*)buffer;
+				printf("Thread %d Created in Process %d\n", info->ThreadId, info->ProcessId);
+				break;
+			}
+
+			case ItemType::ThreadExit:
+			{
+				DisplayTime(header->Time);
+				auto info = (ThreadCreateExitInfo*)buffer;
+				printf("Thread %d Exited from Process %d\n", info->ThreadId, info->ProcessId);
+				break;
+			}
+
 			default:
 				break;
 		}

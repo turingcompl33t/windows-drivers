@@ -18,6 +18,8 @@ NTSTATUS SysMonCreateClose(PDEVICE_OBJECT, PIRP Irp);
 NTSTATUS SysMonRead(PDEVICE_OBJECT, PIRP Irp);
 
 void OnProcessNotify(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo);
+void OnThreadNotify(HANDLE ProcessId, HANDLE ThreadId, BOOLEAN Create);
+
 
 void PushItem(LIST_ENTRY* entry);
 
@@ -63,10 +65,19 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING)
 
 		symLinkCreated = true;
 
+		// register for process notifications
 		status = PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, FALSE);
 		if (!NT_SUCCESS(status))
 		{
-			KdPrint(("Failed to set process notify routine (0x%08x\n", status));
+			KdPrint(("Failed to set process notify routine (0x%08x)\n", status));
+			break;
+		}
+
+		// register for thread notifications
+		status = PsSetCreateThreadNotifyRoutine(OnThreadNotify);
+		if (!NT_SUCCESS(status))
+		{
+			KdPrint(("Failed to set thread notify routine (0x%08x)\n", status));
 			break;
 		}
 	} while (false);
@@ -231,6 +242,26 @@ void OnProcessNotify(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO
 
 		PushItem(&info->Entry);
 	}
+}
+
+void OnThreadNotify(HANDLE ProcessId, HANDLE ThreadId, BOOLEAN Create)
+{
+	auto size = sizeof(FullItem<ThreadCreateExitInfo>);
+	auto info = (FullItem<ThreadCreateExitInfo>*) ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
+	if (nullptr == info)
+	{
+		KdPrint(("Failed to allocate memory for ThreadCreateExitInfo\n"));
+		return;
+	}
+
+	auto& item = info->Data;
+	KeQuerySystemTimePrecise(&item.Time);
+	item.Size = sizeof(item);
+	item.Type = Create ? ItemType::ThreadCreate : ItemType::ThreadExit;
+	item.ProcessId = HandleToULong(ProcessId);
+	item.ThreadId = HandleToULong(ThreadId);
+
+	PushItem(&info->Entry);
 }
 
 /* ----------------------------------------------------------------------------

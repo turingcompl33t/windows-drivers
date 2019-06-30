@@ -1,0 +1,32 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{5a746830-a2a5-11e5-9670-001bdc06a7b9}") = "VerifierTest", "VerifierTest.vcxproj", "{5a68f680-a2a5-11e5-8085-001bdc06a7b9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Debug|x64.ActiveCfg = Debug|x64
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Debug|x64.Build.0 = Debug|x64
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Debug|x64.Deploy.0 = Debug|x64
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Debug|x86.ActiveCfg = Debug|Win32
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Debug|x86.Build.0 = Debug|Win32
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Debug|x86.Deploy.0 = Debug|Win32
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Release|x64.ActiveCfg = Release|x64
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Release|x64.Build.0 = Release|x64
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Release|x64.Deploy.0 = Release|x64
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Release|x86.ActiveCfg = Release|Win32
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Release|x86.Build.0 = Release|Win32
+		{5a68f680-a2a5-11e5-8085-001bdc06a7b9}.Release|x86.Deploy.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
