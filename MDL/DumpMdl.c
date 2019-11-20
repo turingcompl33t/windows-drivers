@@ -52,60 +52,76 @@ DumpMdl(
     DPF(("%20s : %u\n", "Size ", Mdl->Size));
     DPF(("%20s : %08x\n", "MdlFlags ", Mdl->MdlFlags));
 
-    if (Mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA) {
+    if (Mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA) 
+	{
         DPF(("%20s : %s\n", "", "MDL_MAPPED_TO_SYSTEM_VA"));
     }
-    if (Mdl->MdlFlags & MDL_PAGES_LOCKED) {
+    if (Mdl->MdlFlags & MDL_PAGES_LOCKED) 
+	{
         DPF(("%20s : %s\n", "", "MDL_PAGES_LOCKED"));
     }
-    if (Mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL) {
+    if (Mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL) 
+	{
         DPF(("%20s : %s\n", "", "MDL_SOURCE_IS_NONPAGED_POOL"));
     }
-    if (Mdl->MdlFlags & MDL_ALLOCATED_FIXED_SIZE) {
+    if (Mdl->MdlFlags & MDL_ALLOCATED_FIXED_SIZE) 
+	{
         DPF(("%20s : %s\n", "", "MDL_ALLOCATED_FIXED_SIZE"));
     }
-    if (Mdl->MdlFlags & MDL_PARTIAL) {
+    if (Mdl->MdlFlags & MDL_PARTIAL) 
+	{
         DPF(("%20s : %s\n", "", "MDL_PARTIAL"));
     }
-    if (Mdl->MdlFlags & MDL_PARTIAL_HAS_BEEN_MAPPED) {
+    if (Mdl->MdlFlags & MDL_PARTIAL_HAS_BEEN_MAPPED) 
+	{
         DPF(("%20s : %s\n", "", "MDL_PARTIAL_HAS_BEEN_MAPPED"));
     }
-    if (Mdl->MdlFlags & MDL_IO_PAGE_READ) {
+    if (Mdl->MdlFlags & MDL_IO_PAGE_READ) 
+	{
         DPF(("%20s : %s\n", "", "MDL_IO_PAGE_READ"));
     }
-    if (Mdl->MdlFlags & MDL_WRITE_OPERATION) {
+    if (Mdl->MdlFlags & MDL_WRITE_OPERATION) 
+	{
         DPF(("%20s : %s\n", "", "MDL_WRITE_OPERATION"));
     }
 
-    if (Mdl->MdlFlags & MDL_LOCKED_PAGE_TABLES) {
+    if (Mdl->MdlFlags & MDL_LOCKED_PAGE_TABLES) 
+	{
         DPF(("%20s : %s\n", "", "MDL_LOCKED_PAGE_TABLES"));
     }
 
-    if (Mdl->MdlFlags & MDL_FREE_EXTRA_PTES) {
+    if (Mdl->MdlFlags & MDL_FREE_EXTRA_PTES) 
+	{
         DPF(("%20s : %s\n", "", "MDL_FREE_EXTRA_PTES"));
     }
 
-    if (Mdl->MdlFlags & MDL_DESCRIBES_AWE) {
+    if (Mdl->MdlFlags & MDL_DESCRIBES_AWE) 
+	{
         DPF(("%20s : %s\n", "", "MDL_DESCRIBES_AWE"));
     }
 
-    if (Mdl->MdlFlags & MDL_IO_SPACE) {
+    if (Mdl->MdlFlags & MDL_IO_SPACE) 
+	{
         DPF(("%20s : %s\n", "", "MDL_IO_SPACE"));
     }
 
-    if (Mdl->MdlFlags & MDL_NETWORK_HEADER) {
+    if (Mdl->MdlFlags & MDL_NETWORK_HEADER) 
+	{
         DPF(("%20s : %s\n", "", "MDL_NETWORK_HEADER"));
     }
 
-    if (Mdl->MdlFlags & MDL_MAPPING_CAN_FAIL) {
+    if (Mdl->MdlFlags & MDL_MAPPING_CAN_FAIL) 
+	{
         DPF(("%20s : %s\n", "", "MDL_MAPPING_CAN_FAIL"));
     }
 
-    if (Mdl->MdlFlags & MDL_PAGE_CONTENTS_INVARIANT) {
+    if (Mdl->MdlFlags & MDL_PAGE_CONTENTS_INVARIANT) 
+	{
         DPF(("%20s : %s\n", "", "MDL_PAGE_CONTENTS_INVARIANT"));
     }
 
-    if (Mdl->MdlFlags & MDL_INTERNAL) {
+    if (Mdl->MdlFlags & MDL_INTERNAL) 
+	{
         DPF(("%20s : %s\n", "", "MDL_INTERNAL"));
     }
 
@@ -120,12 +136,11 @@ DumpMdl(
 
     DPF(("%20s : %p (%u) :\n", "PfnArray", PfnArray, PfnCount));
 
-    for (Idx = 0; Idx < PfnCount; Idx++) {
+    for (Idx = 0; Idx < PfnCount; Idx++) 
+	{
         DPF(("%20s : [%u] %p\n", "", Idx, PfnArray[Idx]));
     }
 }
-
-
 
 NTSTATUS
 DriverEntry(
@@ -147,7 +162,8 @@ DriverEntry(
     Size = (2 * 1024) + Extra;
 
     g_Alloc = ExAllocatePoolWithTag(PagedPool, Size, 'sldM');
-    if (!g_Alloc) {
+    if (!g_Alloc) 
+	{
         Status = STATUS_UNSUCCESSFUL;
         goto Exit;
     }
@@ -160,8 +176,8 @@ DriverEntry(
         Address,
         Size,
         &g_MappedAddress,
-        &g_MappedMdl)) {
-
+        &g_MappedMdl)) 
+	{
         Status = STATUS_UNSUCCESSFUL;
         goto Exit;
     }
@@ -184,7 +200,8 @@ DriverUnload(
 
     UnmapMemory(g_MappedAddress, g_MappedMdl);
 
-    if (g_Alloc) {
+    if (g_Alloc) 
+	{
         ExFreePool(g_Alloc);
     }
 
@@ -201,23 +218,27 @@ MapMemory(
     PUCHAR MappedAddress = NULL;
 
     Mdl = IoAllocateMdl(Address, Length, FALSE, FALSE, NULL);
-    if (Mdl == NULL) {
+    if (Mdl == NULL) 
+	{
         goto Exit;
     }
     
     DumpMdl(Mdl, "IoAllocateMdl");
 
-    __try {
+    __try 
+	{
         MmProbeAndLockPages(Mdl, KernelMode, IoModifyAccess);
     }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
+    __except (EXCEPTION_EXECUTE_HANDLER) 
+	{
         goto Exit;
     }
 
     DumpMdl(Mdl, "MmProbeAndLockPages");
 
     MappedAddress = MmMapLockedPagesSpecifyCache(Mdl, KernelMode, MmCached, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
-    if (MappedAddress == NULL) {
+    if (MappedAddress == NULL) 
+	{
         goto Exit;
     }
 
@@ -229,15 +250,18 @@ MapMemory(
     return TRUE;
 
 Exit:
-    if (MappedAddress) {
+    if (MappedAddress) 
+	{
         MmUnmapLockedPages(MappedAddress, Mdl);
     }
 
-    if (Mdl) {
+    if (Mdl) 
+	{
         MmUnlockPages(Mdl);
     }
 
-    if (Mdl) {
+    if (Mdl) 
+	{
         IoFreeMdl(Mdl);
     }
 
