@@ -19,3 +19,7 @@ A kernel driver with a user-space client that allows one to set the thread prior
 A kernel driver with a user-space client that allows one to monitor process events (creation, deletion) using the power of driver process callbacks. 
 
 No relation to the Sysinternals tool of the same name. 
+
+**MDL**
+
+A driver to dump Memory Descriptor Lists (MDL).
