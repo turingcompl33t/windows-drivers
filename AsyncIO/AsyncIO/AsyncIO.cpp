@@ -6,9 +6,9 @@
 #include "AsyncIO.h"
 #include "AsyncIoCommon.h"
 
-#pragma warning( disable : 28166 ) // C28166 changes IRQL and does not restore (doesn't like dtors)
-#pragma warning( disable : 28167 ) // C28167 changes IRQL and does not restore (doesn't like dtors)
-#pragma warning( disable : 26110 ) // C26110 caller failing to hold global cancel spin lock
+#pragma warning( disable : 28166 )  // C28166 changes IRQL and does not restore (doesn't like dtors)
+#pragma warning( disable : 28167 )  // C28167 changes IRQL and does not restore (doesn't like dtors)
+#pragma warning( disable : 26110 )  // C26110 caller failing to hold global cancel spin lock
 
 GlobalState g_GlobalState;
 
