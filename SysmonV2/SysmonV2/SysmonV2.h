@@ -8,7 +8,7 @@
 #include "SyncHelpers.h"
 
 // maximum number of items allowed in the queue
-constexpr auto MAX_QUEUE_ITEMS = 1024;
+constexpr auto MAX_QUEUE_ITEMS = 512;
 
 // tag for dynamic allocations
 constexpr ULONG SYSMONV2_ALLOC_TAG = 0x13371337;
@@ -62,7 +62,16 @@ VOID OnThreadNotify(HANDLE ProcessId, HANDLE ThreadId, BOOLEAN bCreate);
 VOID HandleThreadCreate(HANDLE ProcessId, HANDLE ThreadId);
 VOID HandleThreadExit(HANDLE ProcessId, HANDLE ThreadId);
 
-_Requires_lock_not_held_(g_GlobalState.QueueLock)
+_Requires_lock_not_held_(QueueLock)
+template<typename LockType>
+Tuple<NTSTATUS, ULONG> FlushEventQueueToBufferSafe(
+	PLIST_ENTRY pQueueHead,
+	LockType& QueueLock,
+	ULONG& QueueCount,
+	PUCHAR buffer,
+	ULONG bufferSize);
+
+_Requires_lock_not_held_(QueueLock)
 template <typename LockType>
 VOID PushQueueSafe(
 	PLIST_ENTRY pQueueHead,
@@ -70,5 +79,8 @@ VOID PushQueueSafe(
 	ULONG& QueueCount,
 	PLIST_ENTRY entry);
 
+_Requires_lock_not_held_(QueueLock)
 template<typename LockType>
-VOID FlushQueueSafe(const PLIST_ENTRY pQueueHead, LockType& QueueLock);
+VOID FlushQueueSafe(
+	const PLIST_ENTRY pQueueHead, 
+	LockType& QueueLock);

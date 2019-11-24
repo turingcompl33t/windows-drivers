@@ -8,14 +8,21 @@ class Tuple
 {
 public:
 	Tuple(T first, U second)
-		: First(first), Second(second) {};
+		: m_First(first), m_Second(second) {};
 
 	~Tuple() = default;
 
-	T First() const;
-	U Second() const;
+	T First() const
+	{
+		return m_First;
+	}
+
+	U Second() const
+	{
+		return m_Second;
+	}
 
 private:
-	T First;
-	U Second;
+	T m_First;
+	U m_Second;
 };

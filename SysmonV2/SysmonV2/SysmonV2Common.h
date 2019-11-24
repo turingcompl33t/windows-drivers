@@ -26,8 +26,9 @@ enum class ItemType : USHORT
 // common header shared by all item types
 struct ItemHeader
 {
-	ItemType      Type;
-	LARGE_INTEGER Time;
+	ItemType      Type;  // type of event
+	ULONG         Size;  // size of the record, in bytes
+	LARGE_INTEGER Time;  // event timestamp
 };
 
 struct ProcessCreateItem : ItemHeader

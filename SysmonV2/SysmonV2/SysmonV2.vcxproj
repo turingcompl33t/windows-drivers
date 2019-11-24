@@ -138,7 +138,6 @@
   <ItemGroup>
     <ClCompile Include="SyncHelpers.cpp" />
     <ClCompile Include="SysmonV2.cpp" />
-    <ClCompile Include="Tuple.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SyncHelpers.h" />

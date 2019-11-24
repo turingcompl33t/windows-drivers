@@ -191,19 +191,42 @@ NTSTATUS DispatchDeviceIoControl(PDEVICE_OBJECT pDeviceObject, PIRP pIrp)
 		IoCompleteRequest(pIrp, IO_NO_INCREMENT);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
+
+	// get the size of the output buffer
+	auto bufferSize = pIoStackLocation->Parameters.DeviceIoControl.OutputBufferLength;
 	
 	switch (ControlCode)
 	{
 	case IOCTL_SYSMONV2_QUERY_PROCESS_EVENTS:
 	{
-		status = STATUS_SUCCESS;
-		information = 0;
+		Tuple<NTSTATUS, ULONG> res = FlushEventQueueToBufferSafe(
+			&g_GlobalState.ProcessEventQueueHead,
+			g_GlobalState.ProcessEventQueueLock,
+			g_GlobalState.ProcessEventQueueCount,
+			buffer,
+			bufferSize
+		);
+
+		// structured bindings?
+		status      = res.First();
+		information = res.Second();
+
 		break;
 	}
 	case IOCTL_SYSMONV2_QUERY_THREAD_EVENTS:
 	{
-		status = STATUS_SUCCESS;
-		information = 0;
+		Tuple<NTSTATUS, ULONG> res = FlushEventQueueToBufferSafe(
+			&g_GlobalState.ThreadEventQueueHead,
+			g_GlobalState.ThreadEventQueueLock,
+			g_GlobalState.ThreadEventQueueCount,
+			buffer,
+			bufferSize
+		);
+
+		// structured bindings?
+		status      = res.First();
+		information = res.Second();
+
 		break;
 	}
 	default:
@@ -214,50 +237,12 @@ NTSTATUS DispatchDeviceIoControl(PDEVICE_OBJECT pDeviceObject, PIRP pIrp)
 	}
 	}
 
-	pIrp->IoStatus.Status = status;
+	pIrp->IoStatus.Status      = status;
 	pIrp->IoStatus.Information = information;
 
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
 
 	return status;
-}
-
-template<typename LockType>
-Tuple<NTSTATUS, ULONG> FlushEventQueueToBufferSafe(
-	PLIST_ENTRY pQueueHead, 
-	LockType QueueLock, 
-	ULONG& QueueCount, 
-	PUCHAR buffer,
-	ULONG bufferSize)
-{
-	auto status = STATUS_SUCCESS;
-	auto information = 0;
-
-	AutoLock<LockType> locker(QueueLock);
-
-	while (true)
-	{
-		if (IsListEmpty(pQueueHead))
-			break;
-
-		auto pQueueEntry = RemoveHeadList(pQueueHead);
-		auto info = CONTAINING_RECORD(entry, FullItem<ItemHeader>, Entry);
-		auto size = info->Data.Size;
-		if (len < size)
-		{
-			// user's buffer is full, insert item back into list
-			InsertHeadList(&g_Globals.ItemsHead, entry);
-			break;
-		}
-
-		g_Globals.ItemCount--;
-		::memcpy(buffer, &info->Data, size);
-		len -= size;
-		buffer += size;
-		count += size;
-	}
-
-	return Tuple<NT_STATUS, ULONG>{status, information};
 }
 
 /* ----------------------------------------------------------------------------
@@ -294,7 +279,10 @@ VOID HandleProcessCreate(HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO pCreateInfo)
 		allocSize += CommandlineSize;
 	}
 
-	auto pQueueItem = static_cast<QUEUE_ITEM<ProcessCreateItem>*>(ExAllocatePoolWithTag(PagedPool, allocSize, SYSMONV2_ALLOC_TAG));
+	auto pQueueItem = static_cast<QUEUE_ITEM<ProcessCreateItem>*>(
+		ExAllocatePoolWithTag(PagedPool, allocSize, SYSMONV2_ALLOC_TAG)
+		);
+
 	if (nullptr == pQueueItem)
 	{
 		KdPrint(("Failed to allocate memory [THIS IS REALLY BAD]\n"));
@@ -306,7 +294,7 @@ VOID HandleProcessCreate(HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO pCreateInfo)
 	KeQuerySystemTimePrecise(&Data.Time);
 	
 	Data.Type = ItemType::ProcessCreate;
-	
+	Data.Size = sizeof(ProcessCreateItem) + CommandlineSize;
 	Data.ProcessId = HandleToUlong(ProcessId);
 	Data.ParentProcessId = HandleToULong(pCreateInfo->ParentProcessId);
 
@@ -353,6 +341,7 @@ VOID HandleProcessExit(HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO pCreateInfo)
 	KeQuerySystemTimePrecise(&Data.Time);
 
 	Data.Type = ItemType::ProcessExit;
+	Data.Size = sizeof(ProcessExitItem);
 	Data.ProcessId = HandleToULong(ProcessId);
 
 	PushQueueSafe(
@@ -399,6 +388,7 @@ VOID HandleThreadCreate(HANDLE ProcessId, HANDLE ThreadId)
 	KeQuerySystemTimePrecise(&Data.Time);
 
 	Data.Type = ItemType::ThreadCreate;
+	Data.Size = sizeof(ThreadCreateItem);
 	Data.ProcessId = HandleToULong(ProcessId);
 	Data.ThreadId = HandleToUlong(ThreadId);
 	
@@ -427,6 +417,7 @@ VOID HandleThreadExit(HANDLE ProcessId, HANDLE ThreadId)
 	KeQuerySystemTimePrecise(&Data.Time);
 
 	Data.Type = ItemType::ThreadExit;
+	Data.Size = sizeof(ThreadExitItem);
 	Data.ProcessId = HandleToULong(ProcessId);
 	Data.ThreadId = HandleToUlong(ThreadId);
 
@@ -442,6 +433,63 @@ VOID HandleThreadExit(HANDLE ProcessId, HANDLE ThreadId)
  *	Utility Functions
  */
 
+// remove elements from queue one at a time, and serialize
+// to the provided buffer, under lock
+_Use_decl_annotations_
+template<typename LockType>
+Tuple<NTSTATUS, ULONG> FlushEventQueueToBufferSafe(
+	PLIST_ENTRY pQueueHead,
+	LockType& QueueLock,
+	ULONG& QueueCount,
+	PUCHAR buffer,
+	ULONG bufferSize)
+{
+	auto status = STATUS_SUCCESS;
+	ULONG information = 0;
+
+	// handle case in which user does not provide a
+	// sufficiently large buffer for all events
+	auto bufferRemaining = bufferSize;
+
+	AutoLock<LockType> locker(QueueLock);
+
+	while (TRUE)
+	{
+		if (IsListEmpty(pQueueHead))
+		{
+			break;
+		}
+
+		auto pQueueEntry = RemoveHeadList(pQueueHead);
+		auto pFullItem = CONTAINING_RECORD(pQueueEntry, QUEUE_ITEM<ItemHeader>, ListEntry);
+		auto& Data = pFullItem->Data;
+
+		auto itemSize = Data.Size;
+
+		if (bufferRemaining < itemSize)
+		{
+			// user's buffer is full, insert item back into list
+			InsertHeadList(pQueueHead, pQueueEntry);
+			break;
+		}
+
+		// copy the item to the user buffer
+		RtlCopyMemory(buffer, &Data, itemSize);
+
+		// deallocate the removed item
+		ExFreePool(pFullItem);
+
+		// bookkeeping
+		QueueCount--;
+		bufferRemaining -= itemSize;
+		buffer          += itemSize;
+		information     += itemSize;
+	}
+
+	return Tuple<NTSTATUS, ULONG>{status, information};
+}
+
+// add a new element to the queue, under lock
 _Use_decl_annotations_
 template <typename LockType>
 VOID PushQueueSafe(
