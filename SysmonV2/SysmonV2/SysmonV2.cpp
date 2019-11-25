@@ -94,7 +94,7 @@ EXIT:
 		}
 	}
 
-	return STATUS_SUCCESS;
+	return status;
 }
 
 // helper function to initialize global state object

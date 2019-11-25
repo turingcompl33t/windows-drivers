@@ -157,48 +157,48 @@ DWORD DoThreadEventQuery(HANDLE hDevice, LPBYTE buffer)
 // display information recvd from driver query
 void DisplayResults(LPBYTE buffer, DWORD size)
 {
-	auto count = size;
-	while (count > 0)
+	auto bufferRemaining = size;
+	while (bufferRemaining > 0)
 	{
-		auto header = (ItemHeader*)buffer;
+		auto header = reinterpret_cast<ItemHeader*>(buffer);
 
 		switch (header->Type) {
 		case ItemType::ProcessCreate:
 		{
-			DisplayTime(header->Time);
-			auto info = (ProcessCreateItem*)buffer;
-			std::wstring commandLine((WCHAR*)buffer + info->CommandLineOffset);
-			printf("Process %d Created. Coommand Line: %ws\n", info->ProcessId, commandLine.c_str());
+			auto pItem = reinterpret_cast<ProcessCreateItem*>(buffer);
+			DisplayTime(pItem->Time);
+			std::wstring commandLine{ reinterpret_cast<WCHAR*>(buffer) + pItem->CommandLineOffset };
+			printf("Process %d Created. Command Line: %ws\n", pItem->ProcessId, commandLine.c_str());
 			break;
 		}
 		case ItemType::ProcessExit:
 		{
-			DisplayTime(header->Time);
-			auto info = (ProcessExitItem*)buffer;
-			printf("Process %d Exited\n", info->ProcessId);
+			auto pItem = reinterpret_cast<ProcessExitItem*>(buffer);
+			DisplayTime(pItem->Time);
+			printf("Process %d Exited\n", pItem->ProcessId);
 			break;
 		}
 		case ItemType::ThreadCreate:
 		{
-			DisplayTime(header->Time);
-			auto info = (ThreadCreateItem*)buffer;
-			printf("Thread %d Created in Process %d\n", info->ThreadId, info->ProcessId);
+			auto pItem = reinterpret_cast<ThreadCreateItem*>(buffer);
+			DisplayTime(pItem->Time);
+			printf("Thread %d Created in Process %d\n", pItem->ThreadId, pItem->ProcessId);
 			break;
 		}
 
 		case ItemType::ThreadExit:
 		{
-			DisplayTime(header->Time);
-			auto info = (ThreadExitItem*)buffer;
-			printf("Thread %d Exited from Process %d\n", info->ThreadId, info->ProcessId);
+			auto pItem = reinterpret_cast<ThreadExitItem*>(buffer);
+			DisplayTime(pItem->Time);
+			printf("Thread %d Exited from Process %d\n", pItem->ThreadId, pItem->ProcessId);
 			break;
 		}
 		default:
 			break;
 		}
 
-		buffer += header->Size;
-		count -= header->Size;
+		buffer          += header->Size;
+		bufferRemaining -= header->Size;
 	}
 }
 
