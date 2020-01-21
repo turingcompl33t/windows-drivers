@@ -4,107 +4,26 @@
 #include <fltKernel.h>
 #include <dontuse.h>
 
+#include "DelProtect.h"
+
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
 #pragma warning(disable : 26812)  // C26812 prefer scoped enums
 
 PFLT_FILTER gFilterHandle;
-ULONG_PTR OperationStatusCtx = 1;
+ULONG_PTR   OperationStatusCtx = 1;
 
 #define PTDBG_TRACE_ROUTINES            0x00000001
 #define PTDBG_TRACE_OPERATION_STATUS    0x00000002
 
 ULONG gTraceFlags = 0;
 
-#define PT_DBG_PRINT( _dbgLevel, _string )          \
-    (FlagOn(gTraceFlags,(_dbgLevel)) ?              \
-        DbgPrint _string :                          \
-        ((int)0))
-
-/* ----------------------------------------------------------------------------
- *	Prototypes
- */
-
-EXTERN_C_START
-
-DRIVER_INITIALIZE DriverEntry;
-NTSTATUS
-DriverEntry (
-    _In_ PDRIVER_OBJECT DriverObject,
-    _In_ PUNICODE_STRING RegistryPath
-    );
-
-NTSTATUS NTAPI
-DelProtectUnload(
-	_In_ FLT_FILTER_UNLOAD_FLAGS Flags
-	);
-
-NTSTATUS NTAPI
-DelProtectInstanceSetup (
-    _In_ PCFLT_RELATED_OBJECTS FltObjects,
-    _In_ FLT_INSTANCE_SETUP_FLAGS Flags,
-    _In_ DEVICE_TYPE VolumeDeviceType,
-    _In_ FLT_FILESYSTEM_TYPE VolumeFilesystemType
-    );
-
-VOID NTAPI
-DelProtectInstanceTeardownStart (
-    _In_ PCFLT_RELATED_OBJECTS FltObjects,
-    _In_ FLT_INSTANCE_TEARDOWN_FLAGS Flags
-    );
-
-VOID NTAPI
-DelProtectInstanceTeardownComplete (
-    _In_ PCFLT_RELATED_OBJECTS FltObjects,
-    _In_ FLT_INSTANCE_TEARDOWN_FLAGS Flags
-    );
-
-NTSTATUS NTAPI
-DelProtectInstanceQueryTeardown (
-    _In_ PCFLT_RELATED_OBJECTS FltObjects,
-    _In_ FLT_INSTANCE_QUERY_TEARDOWN_FLAGS Flags
-    );
-
-FLT_PREOP_CALLBACK_STATUS NTAPI
-DelProtectPreCreate(
-	_Inout_ PFLT_CALLBACK_DATA Data,
-	_In_    PCFLT_RELATED_OBJECTS FltObjects,
-	_Flt_CompletionContext_Outptr_ PVOID* CompletionContext
-	);
-
-FLT_PREOP_CALLBACK_STATUS NTAPI
-DelProtectPreSetInformation(
-	_Inout_ PFLT_CALLBACK_DATA Data,
-	_In_    PCFLT_RELATED_OBJECTS FltObjects,
-	_Flt_CompletionContext_Outptr_ PVOID* CompletionContext
-	);
-
-// hack to get access to ZwQueryInformationProcess
-NTSTATUS ZwQueryInformationProcess(
-	_In_      HANDLE ProcessHandle,
-	_In_      PROCESSINFOCLASS ProcessInformationClass,
-	_Out_     PVOID ProcessInformation,
-	_In_      ULONG ProcessInformationLength,
-	_Out_opt_ PULONG ReturnLength
-	);
-
-EXTERN_C_END
-
-// assign the code sections for specified routines
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(INIT, DriverEntry)
-#pragma alloc_text(PAGE, DelProtectUnload)
-#pragma alloc_text(PAGE, DelProtectInstanceQueryTeardown)
-#pragma alloc_text(PAGE, DelProtectInstanceSetup)
-#pragma alloc_text(PAGE, DelProtectInstanceTeardownStart)
-#pragma alloc_text(PAGE, DelProtectInstanceTeardownComplete)
-#endif
-
-
 /* ----------------------------------------------------------------------------
  *	Operation Registration
  */
 
+// the callbacks array defines the callbacks for the 
+// operations which we are interested in filtering
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
 
     { IRP_MJ_CREATE,
@@ -168,7 +87,6 @@ DelProtectInstanceSetup (
     return STATUS_SUCCESS;
 }
 
-
 NTSTATUS NTAPI
 DelProtectInstanceQueryTeardown (
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
@@ -190,7 +108,6 @@ DelProtectInstanceQueryTeardown (
     return STATUS_SUCCESS;
 }
 
-
 VOID NTAPI
 DelProtectInstanceTeardownStart (
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
@@ -207,7 +124,6 @@ DelProtectInstanceTeardownStart (
     PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
 		("DelProtect!DelProtectInstanceTeardownStart: Entered\n"));
 }
-
 
 VOID NTAPI
 DelProtectInstanceTeardownComplete (
@@ -256,7 +172,7 @@ DriverEntry (
     if (NT_SUCCESS(status))
 	{
 		// start filtering IO
-        status = FltStartFiltering( gFilterHandle );
+        status = FltStartFiltering(gFilterHandle);
 
         if (!NT_SUCCESS(status))
 		{
@@ -287,6 +203,21 @@ DelProtectUnload (
 
 /* ----------------------------------------------------------------------------
  *	Minifilter Callback Routines
+ *
+ *  File delete operations may be performed by the system in one of two ways:
+ *  - open the file with the FILE_DELETE_ON_CLOSE option, resulting in the file
+ *    being deleted once the last handle to the file is closed
+ *  - using the IRP_MJ_SET_INFORMAION operation which is sort of a swiss-army
+ *    knife for filesystem IO operations, delete being one of the supported operations
+ *
+ *  Furthremore, the system is clever, and if one mechanism for deleting the
+ *  file fails, it will attempt to delete the file with the other operation.
+ *
+ *  Therefore, if we really want to protected a file from deletion, we need to
+ *  intercept file delete requests that originate from both major function sources.
+ *  The two major function callbacks we need to intercept are:
+ *  - IRP_MJ_CREATE
+ *  - IRP_MJ_SET_INFORMATION
  */
 
 FLT_PREOP_CALLBACK_STATUS NTAPI
@@ -298,9 +229,6 @@ DelProtectPreCreate(
 {
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
-
-	PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
-		("DelProtect!DelProtectPreOperation: Entered\n"));
 
 	if (Data->RequestorMode == KernelMode)
 	{
@@ -319,48 +247,17 @@ DelProtectPreCreate(
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 
-	// this is a delete operation!
-	// we want to block delete operations originating from ant cmd.exe process,
-	// and, luckily for us, the CreateFile operation is invoked synchronously, (always?)
-	// the caller is the process that is attempting the delete operation
+    auto status = FLT_PREOP_SUCCESS_NO_CALLBACK;
 
-	auto allocSize = 512;  // arbitrary size large enough for cmd.exe image path
+    if (!DeletePermitted(PsGetCurrentProcess()))
+    {
+        Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+        status = FLT_PREOP_COMPLETE;
 
-	// NOTE: interesting API decision
-	// why don't we just allocate the size of a UNICODE_STRING structure here?
-	// because the API we use to actually get the image path will place the raw
-	// bytes of the string itself directly after the string structure
-	auto pProcessName = static_cast<PUNICODE_STRING>(ExAllocatePool(PagedPool, allocSize));
-	if (nullptr == pProcessName)
-	{
-		// bad...
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
+        KdPrint(("Delete operation via IRP_MJ_CREATE blocked"));
+    }
 
-	RtlZeroMemory(pProcessName, allocSize);
-
-	// do the image name query
-	auto status = ZwQueryInformationProcess(
-		NtCurrentProcess(), 
-		ProcessImageFileName, 
-		pProcessName, 
-		(allocSize - sizeof(WCHAR)), 
-		nullptr
-		);
-
-	if (NT_SUCCESS(status))
-	{
-		// NOTE: this substring search is not robust
-		if ((wcsstr(pProcessName->Buffer, L"\\System32\\cmd.exe") != nullptr)
-			|| (wcsstr(pProcessName->Buffer, L"\\SysWOW64\\cmd.exe") != nullptr))
-		{
-			// match, fail the request
-			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-			return FLT_PREOP_COMPLETE;
-		}
-	}
-
-	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    return status;
 }
 
 FLT_PREOP_CALLBACK_STATUS NTAPI
@@ -370,13 +267,122 @@ DelProtectPreSetInformation(
 	_Flt_CompletionContext_Outptr_ PVOID* CompletionContext
 )
 {
-	UNREFERENCED_PARAMETER(Data);
 	UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(CompletionContext);
 
-	PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
-		("DelProtect!DelProtectPreOperation: Entered\n"));
+    auto& params = Data->Iopb->Parameters.SetFileInformation;
 
-	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    if (params.FileInformationClass != FileDispositionInformation &&
+        params.FileInformationClass != FileDispositionInformationEx
+        )
+    {
+        // note a delete operation via set information
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto info = static_cast<PFILE_DISPOSITION_INFORMATION>(params.InfoBuffer);
+    if (!info->DeleteFile)
+    {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+    // determine the process from which this request originated
+    auto process = PsGetThreadProcess(Data->Thread);
+    NT_ASSERT(process);
+
+    if (!DeletePermitted(process))
+    {
+        Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+        status = FLT_PREOP_COMPLETE;
+
+        KdPrint(("Delete operation via IRP_MJ_SET_INFORMATION blocked"));
+    }
+
+	return status;
+}
+
+// DeletePermitted
+// Determine if the file delete operation is permitted for the specified process.
+bool DeletePermitted(const PEPROCESS process)
+{
+    // determine if the process for which we want to determine if
+    // the delete operation is allowed is the process in whose context
+    // we are currently executing
+    bool currentProcess = PsGetCurrentProcess() == process;
+    
+    HANDLE hProcess;
+    if (currentProcess)
+    {
+        hProcess = NtCurrentProcess();
+    }
+    else
+    {
+        // obtain a handle to the process from the EPROCESS ptr
+        auto status = ObOpenObjectByPointer(
+            process,
+            OBJ_KERNEL_HANDLE,
+            nullptr,
+            0,
+            nullptr,
+            KernelMode,
+            &hProcess
+        );
+
+        if (!NT_SUCCESS(status))
+        {
+            // give up?
+            return true;
+        }
+    }
+
+    // arbitrary allocation size
+    auto allocSize       = 512;
+    bool deletePermitted = true;
+
+    // NOTE: interesting API decision
+    // why don't we just allocate the size of a UNICODE_STRING structure here?
+    // because the API we use to actually get the image path will place the raw
+    // bytes of the string itself directly after the string structure
+    auto pProcessName = static_cast<PUNICODE_STRING>(ExAllocatePool(PagedPool, allocSize));
+    if (nullptr == pProcessName)
+    {
+        // give up?
+        return true;
+    }
+
+    RtlZeroMemory(pProcessName, allocSize);
+
+    // do the image name query
+    auto status = ZwQueryInformationProcess(
+        hProcess,
+        ProcessImageFileName,
+        pProcessName,
+        (allocSize - sizeof(WCHAR)),
+        nullptr
+    );
+
+    if (NT_SUCCESS(status))
+    {
+        // NOTE: this substring search is not robust
+        if ((wcsstr(pProcessName->Buffer, L"\\System32\\cmd.exe") != nullptr)
+            || (wcsstr(pProcessName->Buffer, L"\\SysWOW64\\cmd.exe") != nullptr))
+        {
+            deletePermitted = false;
+        }
+    }
+
+    ExFreePool(pProcessName);
+
+    if (!currentProcess)
+    {
+        // if we are not currently executing in the context of the process
+        // for which we performed the query, need to release the handle
+        // to the process that we have obtained (reference counting FTW)
+        ZwClose(hProcess);
+    }
+
+    return deletePermitted;
 }
 
