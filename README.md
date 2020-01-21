@@ -18,10 +18,6 @@ A filesystem minifilter to block the deletion of specified files.
 
 The obligatory "Hello World" driver. 
 
-**MDL**
-
-A driver to dump Memory Descriptor Lists (MDL).
-
 **PriorityBooster**
 
 A kernel driver with a user-space client that allows one to set the thread priority of a target thread to an arbitrary value, regardless of the priority class of the thread's containing process. 
