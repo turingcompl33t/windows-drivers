@@ -1,10 +1,8 @@
 ### Windows Kernel Drivers
 
-Hoping to see nitric acid act upon copper.
-
-### Drivers
-
 This repository contains a number of experiments in kernel driver development. 
+
+### Driver Descriptions
 
 **AsyncIO**
 
@@ -31,6 +29,10 @@ A driver that exercises the device creation routine to ensure that only a single
 A kernel driver with a user-space client that allows one to monitor process events (creation, deletion) using the power of driver process callbacks. 
 
 No relation to the Sysinternals tool of the same name. 
+
+**SysmonV2**
+
+An updated version of the system monitoring driver with extended functionality. Currently incomplete.
 
 **VerifierTest**
 
