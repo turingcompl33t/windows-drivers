@@ -12,6 +12,10 @@ A simple driver to illustrate various asynchronous IO techniques.
 
 A filesystem minifilter to block the deletion of specified files.
 
+**DeviceMonitor**
+
+A generic filter driver that supports attachment to and detachment from arbitrary device objects. Exposes control to a user-mode client via a control device object.
+
 **Hello**
 
 The obligatory "Hello World" driver. 
